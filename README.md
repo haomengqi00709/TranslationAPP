@@ -1,0 +1,2 @@
+# TranslateAPP
+It's based on the translation_pipeline.py... so run the following in different terminals. It should pop up the frontpage and runs the translation on the backend. I had some issues deploying it on runpod(cloud gpu), burnt some money, but didn't manage to figure it out, so I'm trying using docker, might be a way out, but still experimenting. python3.11 hybrid_app.py --backend streamlit run hybrid_app.py
