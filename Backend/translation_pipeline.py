@@ -2,11 +2,11 @@ import logging
 import os
 import time
 from pathlib import Path
-from extract_all import ContentExtractor
-from translate_all import translate_all_content
-from rag_process import process_content_with_rag
-from update_pptx import update_pptx
-from layout_manager import process_text_layout, process_table_layout, process_chart_layout, apply_layout_adjustments
+from .extract_all import ContentExtractor
+from .translate_all import translate_all_content
+from .rag_process import process_content_with_rag
+from .update_pptx import update_pptx
+from .layout_manager import process_text_layout, process_table_layout, process_chart_layout, apply_layout_adjustments
 from pptx import Presentation
 import json
 

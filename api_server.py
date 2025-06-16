@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 import time
-from translation_pipeline import run_pipeline
+from Backend.translation_pipeline import run_pipeline
 import logging
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -99,12 +99,12 @@ async def translate_presentation(
         logger.error(f"Translation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
         
-    finally:
-        # Clean up temporary files
-        try:
-            shutil.rmtree(base_dir)
-        except Exception as e:
-            logger.error(f"Failed to clean up temporary files: {e}")
+    # finally:
+    #     # Clean up temporary files
+    #     try:
+    #         shutil.rmtree(base_dir)
+    #     except Exception as e:
+    #         logger.error(f"Failed to clean up temporary files: {e}")
 
 @app.get("/health")
 async def health_check():
