@@ -9,27 +9,36 @@ import shutil
 import base64
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
-RUNPOD_API_KEY = os.getenv("RUNPOD_API_KEY", "")
-RUNPOD_ENDPOINT = os.getenv("RUNPOD_ENDPOINT", "")  # Your RunPod endpoint URL
+# Load secrets from Streamlit
+RUNPOD_API_KEY = st.secrets["runpod"]["api_key"]
+RUNPOD_ENDPOINT = st.secrets["runpod"]["endpoint"]
 BACKEND_URL = RUNPOD_ENDPOINT if RUNPOD_ENDPOINT else "http://localhost:8000"
+
+# App configuration
+APP_TITLE = st.secrets["app"]["title"]
+APP_DESCRIPTION = st.secrets["app"]["description"]
+
+# Model configuration
+DEFAULT_MODEL = st.secrets["models"]["default_model"]
+AVAILABLE_MODELS = st.secrets["models"]["available_models"]
+
+# Upload configuration
+MAX_FILE_SIZE = st.secrets["upload"]["max_file_size"] * 1024 * 1024  # Convert to bytes
+ALLOWED_EXTENSIONS = st.secrets["upload"]["allowed_extensions"]
 
 def streamlit_frontend():
     st.set_page_config(
-        page_title="PowerPoint Translation",
+        page_title=APP_TITLE,
         page_icon="📊",
         layout="wide"
     )
     
-    st.title("PowerPoint Translation")
-    st.write("Upload your PowerPoint presentation and optionally a glossary file to translate it to French.")
+    st.title(APP_TITLE)
+    st.write(APP_DESCRIPTION)
     
     # File upload
     pptx_file = st.file_uploader("Upload PowerPoint File", type=['pptx'])
@@ -38,8 +47,8 @@ def streamlit_frontend():
     # Model selection
     model_name = st.selectbox(
         "Select Translation Model",
-        ["Qwen/Qwen3-8B", "Qwen/Qwen3-14B", "Qwen/Qwen3-72B"],
-        index=0
+        AVAILABLE_MODELS,
+        index=AVAILABLE_MODELS.index(DEFAULT_MODEL)
     )
     
     # Layout option
@@ -51,6 +60,11 @@ def streamlit_frontend():
     if st.button("Translate"):
         if not pptx_file:
             st.error("Please upload a PowerPoint file.")
+            return
+            
+        # Check file size
+        if pptx_file.size > MAX_FILE_SIZE:
+            st.error(f"File size exceeds the maximum limit of {MAX_FILE_SIZE/1024/1024}MB")
             return
             
         try:
