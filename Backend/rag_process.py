@@ -1,18 +1,23 @@
 import json
 import logging
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from typing import Dict, Any, List, Tuple
 import time
 from pathlib import Path
 import shutil
+from Backend.model_loader import get_model_and_tokenizer
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Check for MPS availability
-device = "mps" if torch.backends.mps.is_available() else "cpu"
+# Device selection: CUDA > MPS > CPU
+if torch.cuda.is_available():
+    device = "cuda"
+elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    device = "mps"
+else:
+    device = "cpu"
 logger.info(f"Using device: {device}")
 
 def load_rag_terms_list(jsonl_path: str) -> List[Tuple[str, str]]:
@@ -44,15 +49,10 @@ def build_focused_rag_context(found_terms: List[Tuple[str, str]]) -> str:
     return "\n".join(lines)
 
 class LocalTranslator:
-    def __init__(self, model_name: str = "Qwen/Qwen3-8B"):
-        logger.info(f"Loading model: {model_name}")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16,
-            device_map=device
-        )
-        logger.info("Model loaded successfully")
+    def __init__(self, model, tokenizer):
+        logger.info("Model and tokenizer assigned to LocalTranslator")
+        self.model = model
+        self.tokenizer = tokenizer
 
     def translate(self, text: str, rag_context: str = None) -> str:
         try:
@@ -137,10 +137,10 @@ def filter_lines_by_glossary(input_file: str, glossary_file: str, filtered_outpu
                 continue
     logger.info(f"Extracted {found_count} lines containing RAG terms to {filtered_output_file}")
 
-def translate_filtered_lines(filtered_input_file: str, glossary_file: str, output_file: str, model_name: str = "Qwen/Qwen3-8B"):
+def translate_filtered_lines(filtered_input_file: str, glossary_file: str, output_file: str, model, tokenizer):
     """Translate only the filtered lines using focused RAG context."""
     rag_terms = load_rag_terms_list(glossary_file)
-    translator = LocalTranslator(model_name)
+    translator = LocalTranslator(model, tokenizer)
     with open(filtered_input_file, 'r', encoding='utf-8') as f_in, \
          open(output_file, 'w', encoding='utf-8') as f_out:
         for i, line in enumerate(f_in, 1):
@@ -310,7 +310,7 @@ def process_content_with_rag(
     
     # Second pass: Process items if we found any
     logger.info("Found items requiring RAG processing. Loading model...")
-    translator = LocalTranslator(model_name)
+    model, tokenizer = get_model_and_tokenizer(model_name, device=device)
     
     for input_file, filtered_file, translated_file, merged_file in content_types:
         input_path = input_file
@@ -331,7 +331,8 @@ def process_content_with_rag(
             filtered_input_file=filtered_path,
             glossary_file=glossary_file,
             output_file=f"{output_dir}/{translated_file}",
-            model_name=model_name
+            model=model,
+            tokenizer=tokenizer
         )
         
         # Step 3: Merge translations back

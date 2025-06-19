@@ -1,33 +1,33 @@
 import json
 import logging
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from typing import Dict, Any, List
 import time
 from pathlib import Path
+from Backend.model_loader import get_model_and_tokenizer
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Check for MPS availability
-device = "mps" if torch.backends.mps.is_available() else "cpu"
+# Device selection: CUDA > MPS > CPU
+if torch.cuda.is_available():
+    device = "cuda"
+elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+    device = "mps"
+else:
+    device = "cpu"
 logger.info(f"Using device: {device}")
 
 class LocalTranslator:
-    def __init__(self, model_name: str = "Qwen/Qwen3-8B"):
-        """Initialize the translator with a local LLM model."""
-        logger.info(f"Loading model: {model_name}")
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16,
-            device_map=device
-        )
-        logger.info("Model loaded successfully")
+    def __init__(self, model, tokenizer):
+        """Initialize the translator with a shared LLM model and tokenizer."""
+        self.model = model
+        self.tokenizer = tokenizer
+        logger.info("Model and tokenizer assigned to LocalTranslator")
 
     def translate(self, text: str) -> str:
-        """Translate English text to French using the local model."""
+        """Translate English text to French using the shared model."""
         try:
             # Create messages for chat template
             messages = [
@@ -93,7 +93,7 @@ def process_jsonl_line(line: str, translator: LocalTranslator) -> Dict[str, Any]
                 english_text = data['text']
                 french_text = translator.translate(english_text)
                 data['french_text'] = french_text
-            
+        
         return data
     except json.JSONDecodeError:
         logger.error(f"Error decoding JSON line: {line}")
@@ -128,8 +128,20 @@ def translate_all_content(input_dir: str = "input", output_dir: str = "output", 
     # Create output directory if it doesn't exist
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
-    # Initialize translator once for all files
-    translator = LocalTranslator(model_name)
+    print("[TIMER] Starting model/tokenizer loading...")
+    t0 = time.time()
+    model, tokenizer = get_model_and_tokenizer(model_name)
+    print(f"[TIMER] Model/tokenizer loaded in {time.time() - t0:.2f} seconds.")
+
+    print("[TIMER] Moving model to device...")
+    t1 = time.time()
+    model = model.to(device)
+    print(f"[TIMER] Model moved to device in {time.time() - t1:.2f} seconds.")
+
+    print("[TIMER] Initializing LocalTranslator...")
+    t2 = time.time()
+    translator = LocalTranslator(model, tokenizer)
+    print(f"[TIMER] LocalTranslator initialized in {time.time() - t2:.2f} seconds.")
     
     # Define input/output file pairs
     file_pairs = [
@@ -140,6 +152,7 @@ def translate_all_content(input_dir: str = "input", output_dir: str = "output", 
     
     total_processed = 0
     start_time = time.time()
+    print("[TIMER] Starting translation loop...")
     
     # Process each file pair
     for input_file, output_file in file_pairs:
@@ -156,6 +169,7 @@ def translate_all_content(input_dir: str = "input", output_dir: str = "output", 
         logger.info(f"Completed {input_file}: {processed} items translated")
     
     end_time = time.time()
+    print(f"[TIMER] Translation loop finished in {end_time - start_time:.2f} seconds.")
     logger.info(f"Translation complete!")
     logger.info(f"Total items translated: {total_processed}")
     logger.info(f"Time taken: {end_time - start_time:.2f} seconds")
