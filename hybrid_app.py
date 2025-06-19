@@ -53,28 +53,33 @@ def streamlit_frontend():
     
     # Custom terms section right below
     st.write("**Or add custom terms:**")
-    col1, col2 = st.columns(2)
     
-    with col1:
-        english_term = st.text_input("English Term", key="eng_term", placeholder="e.g., Technical Term")
-    with col2:
-        french_term = st.text_input("French Translation", key="fr_term", placeholder="e.g., Terme technique")
-    
-    # Add button
-    if st.button("➕ Add Term", type="secondary"):
-        if english_term and french_term:
-            # Add to session state
-            if 'custom_glossary' not in st.session_state:
-                st.session_state.custom_glossary = []
-            st.session_state.custom_glossary.append({
-                'en': english_term.strip(),
-                'fr': french_term.strip()
-            })
-            st.success(f"✅ Added: {english_term} → {french_term}")
-            # Clear the input fields
-            st.rerun()
-        elif not english_term or not french_term:
-            st.error("Please enter both English and French terms")
+    # Use form for Enter key functionality
+    with st.form("add_term_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            english_term = st.text_input("English Term", key="eng_term_input", placeholder="e.g., Technical Term")
+        with col2:
+            french_term = st.text_input("French Translation", key="fr_term_input", placeholder="e.g., Terme technique")
+        
+        # Add button inside form
+        submitted = st.form_submit_button("➕ Add Term", type="secondary")
+        
+        # Handle form submission (triggered by Enter key or button click)
+        if submitted:
+            if english_term and french_term:
+                # Add to session state
+                if 'custom_glossary' not in st.session_state:
+                    st.session_state.custom_glossary = []
+                st.session_state.custom_glossary.append({
+                    'en': english_term.strip(),
+                    'fr': french_term.strip()
+                })
+                st.success(f"✅ Added: {english_term} → {french_term}")
+                # Form will automatically clear on next interaction
+            elif not english_term or not french_term:
+                st.error("Please enter both English and French terms")
     
     # Display current custom glossary in a nice format
     if 'custom_glossary' in st.session_state and st.session_state.custom_glossary:
